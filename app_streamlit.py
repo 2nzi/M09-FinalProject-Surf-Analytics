@@ -13,15 +13,11 @@ st.subheader("Surf Analytics")
 
 st.markdown("""
     Bienvenue sur le projet Surf Analytics` réalisé par Walid Guillaume Valentine et Antoine.
-    <a href="https://twitter.com/GuillaumeRozier" style="text-decoration: none;">@createur_link</a>.
+    <a href="https://twitter.com" style="text-decoration: none;">@createur_link</a>.
 """, unsafe_allow_html=True)
 
 
-
-
 st.title("Surf Maneuver Classification")
-
-
 
 
 uploaded_file = st.file_uploader("Upload a video file", type=["mp4", "avi", "mov"])
@@ -36,12 +32,6 @@ if uploaded_file is not None:
 
     files = {'file': uploaded_file.getvalue()}
     response = requests.post("http://127.0.0.1:4000/classify", files=files)
-    # response = requests.post("http://localhost:4000/classify", files=files)
-    
-    # if response.status_code == 200:
-    #     st.write(f"Predicted Label: {response.json()}")
-    # else:
-    #     st.write("Error in prediction")
 
     if response.status_code == 200:
         st.success(f"Predicted Label: {response.json()}")
