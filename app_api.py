@@ -64,28 +64,27 @@ app = FastAPI(
     version="0.1",
     contact={
         "name": "Guillaume Valentine Walid Antoine",
-        "url": "antoineverdon.pro@gmail.com",
+        "url": "name.pro@gmail.com",
     }
 )
+
+image_processor = AutoImageProcessor.from_pretrained(model_ckpt)
+model = VideoMAEForVideoClassification.from_pretrained(model_ckpt)
+
 
 
 app = FastAPI()
 
 
-@app.post("/post-picture", tags=["Blog Endpoints"])
-async def post_picture(file: UploadFile= File(...)):
+@app.get("/")
+async def post_picture():
     """
     Upload a picture and read its file name.
     """
-    return {"picture": file.filename}
+    return 'Bienvenue sur notre API de surf'
 
 
-class PredictionFeatures(BaseModel):
-    SurfManveuver: str ="demo-cutback-frontside.mp4"
-
-
-
-@app.post("/predict")
+@app.post("/classify")
 async def predict(file: UploadFile= File(...)):
     """
     Prediction of ...
@@ -99,8 +98,8 @@ async def predict(file: UploadFile= File(...)):
     indices = sample_frame_indices(clip_len=16, frame_sample_rate=4, seg_len=container.streams.video[0].frames)
     video = read_video_pyav(container, indices)
 
-    image_processor = AutoImageProcessor.from_pretrained(model_ckpt)
-    model = VideoMAEForVideoClassification.from_pretrained(model_ckpt)
+    if container.streams.video[0].frames < 16:
+        return 'Video trop courte'
 
     inputs = image_processor(list(video), return_tensors="pt")
 
@@ -114,62 +113,7 @@ async def predict(file: UploadFile= File(...)):
     
     return model.config.id2label[predicted_label]
 
-
-# @app.post("/predict")
-# async def predict(predictionFeatures: PredictionFeatures):
-#     """
-#     Prediction of ...
-#     """
-
-#     file_path = hf_hub_download(repo_id="2nzi/surf-maneuvers", filename=predictionFeatures.SurfManveuver, repo_type="dataset")
-#     print(predictionFeatures.SurfManveuver)
-#     container = av.open(file_path)
-
-#     # sample 16 frames
-#     indices = sample_frame_indices(clip_len=16, frame_sample_rate=4, seg_len=container.streams.video[0].frames)
-#     video = read_video_pyav(container, indices)
-
-#     image_processor = AutoImageProcessor.from_pretrained(model_ckpt)
-#     model = VideoMAEForVideoClassification.from_pretrained(model_ckpt)
-
-#     inputs = image_processor(list(video), return_tensors="pt")
-
-#     with torch.no_grad():
-#         outputs = model(**inputs)
-#         logits = outputs.logits
-
-#     # model predicts one of the 400 Kinetics-400 classes
-#     predicted_label = logits.argmax(-1).item()
-#     print(model.config.id2label[predicted_label])
-    
-#     return model.config.id2label[predicted_label]
-
-
-
-
-
 if __name__=="__main__":
     uvicorn.run(app, host="0.0.0.0", port=4000)
+    
 
-
-
-
-# @app.post("/batch-pred")
-# async def batch_pred(file: UploadFile = File(...)):
-#     """
-#     Make batch predictions 
-
-#     """
-#     df = pd.read_excel(file.file)
-
-#     # Log model from mlflow 
-#     logged_model = 'runs:/5e54b2ee620546b0914c9e9fbfd18875/salary_estimator'
-
-#     # Load model as a PyFuncModel.
-#     loaded_model = mlflow.pyfunc.load_model(logged_model)
-#     prediction = loaded_model.predict(df)
-
-#     # Format response
-#     response = {"prediction": prediction.tolist()}
-
-#     return response
