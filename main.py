@@ -1,14 +1,9 @@
 import numpy as np
 import av
 import torch
-from transformers import VideoMAEForVideoClassification, AutoImageProcessor, AutoModelForVideoClassification
-import uvicorn
-from fastapi import FastAPI, File, UploadFile
-
-
-model_ckpt = '2nzi/videomae-surf-analytics'
-image_processor = AutoImageProcessor.from_pretrained(model_ckpt)
-model = AutoModelForVideoClassification.from_pretrained(model_ckpt)
+# from transformers.models.auto import AutoImageProcessor, AutoModelForVideoClassification
+from transformers import AutoImageProcessor, AutoModelForVideoClassification
+import streamlit as st
 
 
 def read_video_pyav(container, indices):
@@ -51,45 +46,8 @@ def sample_frame_indices(clip_len, frame_sample_rate, seg_len):
 
 
 
-description = """
-Description à faire
-"""
-
-app = FastAPI(
-    title="Surf Analytics",
-    description=description,
-    version="0.1",
-    contact={
-        "name": "Guillaume Valentine Walid Antoine",
-        "url": "name.pro@gmail.com",
-    }
-)
-
-image_processor = AutoImageProcessor.from_pretrained(model_ckpt)
-model = VideoMAEForVideoClassification.from_pretrained(model_ckpt)
-
-
-
-app = FastAPI()
-
-
-@app.get("/")
-async def post_picture():
-    """
-    Upload a picture and read its file name.
-    """
-    return 'Bienvenue sur notre API de surf'
-
-
-@app.post("/classify")
-async def predict(file: UploadFile= File(...)):
-    """
-    Prediction of ...
-    """
-
-    # file_path = hf_hub_download(repo_id="2nzi/surf-maneuvers", filename=file.filename, repo_type="dataset")
-    print(file.filename)
-    container = av.open(file.file)
+def classify(file):
+    container = av.open(file)
 
     # sample 16 frames
     indices = sample_frame_indices(clip_len=16, frame_sample_rate=4, seg_len=container.streams.video[0].frames)
@@ -110,7 +68,30 @@ async def predict(file: UploadFile= File(...)):
     
     return model.config.id2label[predicted_label]
 
-if __name__=="__main__":
-    uvicorn.run(app, host="0.0.0.0", port=4000)
-    
 
+model_ckpt = '2nzi/videomae-surf-analytics'
+# pipe = pipeline("video-classification", model="2nzi/videomae-surf-analytics")
+image_processor = AutoImageProcessor.from_pretrained(model_ckpt)
+model = AutoModelForVideoClassification.from_pretrained(model_ckpt)
+
+
+
+
+
+st.subheader("Surf Analytics")
+
+st.markdown("""
+    Bienvenue sur le projet Surf Analytics réalisé par Walid, Guillaume, Valentine, et Antoine.
+            
+    <a href="https://github.com/2nzi/M09-FinalProject-Surf-Analytics" style="text-decoration: none;">@Surf-Analytics-Github</a>.
+""", unsafe_allow_html=True)
+
+st.title("Surf Maneuver Classification")
+
+uploaded_file = st.file_uploader("Upload a video file", type=["mp4", "avi", "mov"])
+
+if uploaded_file is not None:
+    video_bytes = uploaded_file.read()
+    st.video(video_bytes)
+    predicted_label = classify(uploaded_file)
+    st.success(f"Predicted Label: {predicted_label}")

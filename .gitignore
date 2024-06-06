@@ -176,4 +176,4 @@ cython_debug/
 .env
 Dokerfile1
 Dokerfile2
-video_classification.ipynb
+*.ipynb
