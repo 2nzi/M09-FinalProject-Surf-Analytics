@@ -1,25 +1,19 @@
-#%%
-import pandas as pd
 import torch
-from transformers import TrainingArguments, Trainer, VideoMAEForVideoClassification, VideoMAEConfig,VideoMAEImageProcessor
+from transformers import TrainingArguments, Trainer, VideoMAEForVideoClassification, VideoMAEImageProcessor
 from datasets import load_metric
 import pytorchvideo.data
 import os
-import random
 import pathlib
-import shutil
-from torchvision.transforms import Compose, Lambda, RandomCrop, RandomHorizontalFlip, Resize
-from pytorchvideo.transforms import UniformTemporalSubsample, Normalize, RandomShortSideScale, ApplyTransformToKey
-import imageio
-import numpy as np
-from IPython.display import Image
-from dotenv import load_dotenv
+from torchvision.transforms import Compose, Lambda, Resize
+from pytorchvideo.transforms import UniformTemporalSubsample, Normalize, ApplyTransformToKey
 
-print("Lib imports successful")
+# from dotenv import load_dotenv
 
-load_dotenv()
-HF_KEY = os.environ["HF_KEY"]
-print("HF_KEY import successful")
+# print("Lib imports successful")
+
+# load_dotenv()
+# HF_KEY = os.environ["HF_KEY"]
+# print("HF_KEY import successful")
 
 # from huggingface_hub import notebook_login
 # notebook_login()
@@ -46,7 +40,6 @@ id2label = {i: label for label, i in label2id.items()}
 print(f"Unique classes: {list(label2id.keys())}.")
 
 
-# %%
 model_ckpt = "MCG-NJU/videomae-base"  # pre-trained model from which to fine-tune
 batch_size = 8  # batch size for training and evaluation
 
@@ -99,10 +92,7 @@ transform = Compose(
                     UniformTemporalSubsample(num_frames_to_sample),
                     Lambda(lambda x: x / 255.0),
                     Normalize(mean, std),
-                    # RandomShortSideScale(min_size=256, max_size=320),
-                    # RandomCrop(resize_to),
-                    # RandomHorizontalFlip(p=0.5),
-                    Resize((224, 224)),  # Resize images to 224x224
+                    Resize((224, 224)),
 
                 ]
             ),
