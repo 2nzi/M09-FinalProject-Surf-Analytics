@@ -44,7 +44,14 @@ def sample_frame_indices(clip_len, frame_sample_rate, seg_len):
     indices = np.clip(indices, start_idx, end_idx - 1).astype(np.int64)
     return indices
 
-
+def sample_frame_indices2(clip_len, frame_sample_rate, seg_len):
+    '''
+    Description
+    Args:
+    Returns:
+        indices (`List[int]`): List of sampled frame indices
+    '''
+    return 
 
 def classify(file):
     container = av.open(file)
