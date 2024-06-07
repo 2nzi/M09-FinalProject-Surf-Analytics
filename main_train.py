@@ -7,18 +7,6 @@ import pathlib
 from torchvision.transforms import Compose, Lambda, Resize
 from pytorchvideo.transforms import UniformTemporalSubsample, Normalize, ApplyTransformToKey
 
-# from dotenv import load_dotenv
-
-# print("Lib imports successful")
-
-# load_dotenv()
-# HF_KEY = os.environ["HF_KEY"]
-# print("HF_KEY import successful")
-
-# from huggingface_hub import notebook_login
-# notebook_login()
-# print("Connected to HG hub")
-
 
 dataset_root_path = 'data-split'
 dataset_root_path = pathlib.Path(dataset_root_path)
@@ -74,14 +62,20 @@ f1_metric = load_metric("f1")
 def compute_metrics(eval_pred):
     predictions = eval_pred.predictions.argmax(axis=1)
     references = eval_pred.label_ids
+    return accuracy_metric.compute(predictions=predictions, references=references)
+
+
+# def compute_metrics(eval_pred):
+#     predictions = eval_pred.predictions.argmax(axis=1)
+#     references = eval_pred.label_ids
     
-    accuracy = accuracy_metric.compute(predictions=predictions, references=references)
-    f1 = f1_metric.compute(predictions=predictions, references=references, average='weighted')
+#     accuracy = accuracy_metric.compute(predictions=predictions, references=references)
+#     f1 = f1_metric.compute(predictions=predictions, references=references, average='weighted')
     
-    return {
-        "accuracy": accuracy["accuracy"],
-        "f1": f1["f1"]
-    }
+#     return {
+#         "accuracy": accuracy["accuracy"],
+#         "f1": f1["f1"]
+#     }
 
 # Define Collate Function
 def collate_fn(examples):
