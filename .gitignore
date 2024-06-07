@@ -163,6 +163,7 @@ cython_debug/
 /Database
 /videomae-base-finetuned-2
 /videomae-base-finetuned
+/videomae-timesformer-surf-analytics
 *.gif
 
 *.pdf

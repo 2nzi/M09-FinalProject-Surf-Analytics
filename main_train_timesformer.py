@@ -1,23 +1,12 @@
+
 import torch
-from transformers import TrainingArguments, Trainer, VideoMAEForVideoClassification, VideoMAEImageProcessor
+from transformers import TrainingArguments, Trainer, VideoMAEImageProcessor,TimesformerForVideoClassification,VivitForVideoClassification
 from datasets import load_metric
 import pytorchvideo.data
 import os
 import pathlib
 from torchvision.transforms import Compose, Lambda, Resize
 from pytorchvideo.transforms import UniformTemporalSubsample, Normalize, ApplyTransformToKey
-
-# from dotenv import load_dotenv
-
-# print("Lib imports successful")
-
-# load_dotenv()
-# HF_KEY = os.environ["HF_KEY"]
-# print("HF_KEY import successful")
-
-# from huggingface_hub import notebook_login
-# notebook_login()
-# print("Connected to HG hub")
 
 
 dataset_root_path = 'data-split'
@@ -40,12 +29,13 @@ id2label = {i: label for label, i in label2id.items()}
 print(f"Unique classes: {list(label2id.keys())}.")
 
 
-model_ckpt = "MCG-NJU/videomae-base"  # pre-trained model from which to fine-tune
+model_processor = "MCG-NJU/videomae-base"  # pre-trained model from which to fine-tune
+model_classification = "facebook/timesformer-base-finetuned-k400"  # pre-trained model from which to fine-tune
 batch_size = 8  # batch size for training and evaluation
 
-image_processor = VideoMAEImageProcessor.from_pretrained(model_ckpt)
-model = VideoMAEForVideoClassification.from_pretrained(
-    model_ckpt,
+image_processor = VideoMAEImageProcessor.from_pretrained(model_processor)
+model = TimesformerForVideoClassification.from_pretrained(
+    model_classification,
     label2id=label2id,
     id2label=id2label,
     ignore_mismatched_sizes=True,  # Pour le fine tune
@@ -61,27 +51,20 @@ else:
 resize_to = (height, width)
 
 num_frames_to_sample = model.config.num_frames
+# sample_rate = 16
 sample_rate = 4
 fps = 30
 clip_duration = num_frames_to_sample * sample_rate / fps
 
 
 
-
-accuracy_metric = load_metric("accuracy")
-f1_metric = load_metric("f1")
+# Define Evaluation Metric
+metric = load_metric("accuracy")
 
 def compute_metrics(eval_pred):
     predictions = eval_pred.predictions.argmax(axis=1)
     references = eval_pred.label_ids
-    
-    accuracy = accuracy_metric.compute(predictions=predictions, references=references)
-    f1 = f1_metric.compute(predictions=predictions, references=references, average='weighted')
-    
-    return {
-        "accuracy": accuracy["accuracy"],
-        "f1": f1["f1"]
-    }
+    return metric.compute(predictions=predictions, references=references)
 
 # Define Collate Function
 def collate_fn(examples):
@@ -132,8 +115,8 @@ test_dataset = pytorchvideo.data.Ucf101(
 )
 
 
-new_model_name = "videomae-surf-analytics-2"
-num_epochs = 1
+new_model_name = "videomae-timesformer-surf-analytics"
+num_epochs = 5
 batch_size = 4
 
 args = TrainingArguments(
