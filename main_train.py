@@ -8,6 +8,36 @@ from torchvision.transforms import Compose, Lambda, Resize
 from pytorchvideo.transforms import UniformTemporalSubsample, Normalize, ApplyTransformToKey
 
 
+accuracy_metric = load_metric("accuracy")
+f1_metric = load_metric("f1")
+
+def compute_metrics(eval_pred):
+    predictions = eval_pred.predictions.argmax(axis=1)
+    references = eval_pred.label_ids
+    return accuracy_metric.compute(predictions=predictions, references=references)
+
+
+# def compute_metrics(eval_pred):
+#     predictions = eval_pred.predictions.argmax(axis=1)
+#     references = eval_pred.label_ids
+    
+#     accuracy = accuracy_metric.compute(predictions=predictions, references=references)
+#     f1 = f1_metric.compute(predictions=predictions, references=references, average='weighted')
+    
+#     return {
+#         "accuracy": accuracy["accuracy"],
+#         "f1": f1["f1"]
+#     }
+
+# Define Collate Function
+def collate_fn(examples):
+    pixel_values = torch.stack([example["video"].permute(1, 0, 2, 3) for example in examples])
+    labels = torch.tensor([example["label"] for example in examples])
+    return {"pixel_values": pixel_values, "labels": labels}
+
+
+
+
 dataset_root_path = 'data-split'
 dataset_root_path = pathlib.Path(dataset_root_path)
 train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
@@ -27,7 +57,6 @@ label2id = {label: i for i, label in enumerate(class_labels)}
 id2label = {i: label for label, i in label2id.items()}
 print(f"Unique classes: {list(label2id.keys())}.")
 
-
 model_ckpt = "MCG-NJU/videomae-base"  # pre-trained model from which to fine-tune
 batch_size = 8  # batch size for training and evaluation
 
@@ -36,7 +65,7 @@ model = VideoMAEForVideoClassification.from_pretrained(
     model_ckpt,
     label2id=label2id,
     id2label=id2label,
-    ignore_mismatched_sizes=True,  # Pour le fine tune
+    ignore_mismatched_sizes=True,
 )
 
 mean = image_processor.image_mean
@@ -52,37 +81,6 @@ num_frames_to_sample = model.config.num_frames
 sample_rate = 4
 fps = 30
 clip_duration = num_frames_to_sample * sample_rate / fps
-
-
-
-
-accuracy_metric = load_metric("accuracy")
-f1_metric = load_metric("f1")
-
-# def compute_metrics(eval_pred):
-#     predictions = eval_pred.predictions.argmax(axis=1)
-#     references = eval_pred.label_ids
-#     return accuracy_metric.compute(predictions=predictions, references=references)
-
-
-def compute_metrics(eval_pred):
-    predictions = eval_pred.predictions.argmax(axis=1)
-    references = eval_pred.label_ids
-    
-    accuracy = accuracy_metric.compute(predictions=predictions, references=references)
-    f1 = f1_metric.compute(predictions=predictions, references=references, average='weighted')
-    
-    return {
-        "accuracy": accuracy["accuracy"],
-        "f1": f1["f1"]
-    }
-
-# Define Collate Function
-def collate_fn(examples):
-    pixel_values = torch.stack([example["video"].permute(1, 0, 2, 3) for example in examples])
-    labels = torch.tensor([example["label"] for example in examples])
-    return {"pixel_values": pixel_values, "labels": labels}
-
 
 
 transform = Compose(
@@ -125,7 +123,6 @@ test_dataset = pytorchvideo.data.Ucf101(
     transform=transform,
 )
 
-
 new_model_name = "videomae-surf-analytics-2"
 num_epochs = 1
 batch_size = 4
@@ -133,7 +130,7 @@ batch_size = 4
 args = TrainingArguments(
     new_model_name,
     remove_unused_columns=False,
-    evaluation_strategy="epoch",
+    eval_strategy="epoch",
     save_strategy="epoch",
     learning_rate=5e-5,
     per_device_train_batch_size=batch_size,
@@ -145,7 +142,6 @@ args = TrainingArguments(
     push_to_hub=True,
     max_steps=(train_dataset.num_videos // batch_size) * num_epochs,
 )
-
 
 trainer = Trainer(
     model,

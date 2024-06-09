@@ -1,4 +1,8 @@
 #%%
+#--------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------   LIB   ---------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+
 import torch
 from transformers import AutoImageProcessor, AutoModelForVideoClassification
 from sklearn.metrics import f1_score, accuracy_score, classification_report
@@ -12,7 +16,15 @@ import torch
 from transformers import AutoImageProcessor, AutoModelForVideoClassification
 import pathlib
 from tqdm import tqdm
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+
+#%%
+#--------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------   FONCTIONS   ---------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
 
 def read_video_pyav(container, indices):
     '''
@@ -63,11 +75,13 @@ def process_video(video_path, image_processor):
     return inputs
 
 # Calculer le F1-score et d'autres métriques
-def evaluate(predictions, true_labels):
-    f1 = f1_score(true_labels, predictions)
-    accuracy = accuracy_score(true_labels, predictions)
-    report = classification_report(true_labels, predictions)
-    return f1, accuracy, report
+def evaluate(df):
+    true_labels,pred_labels=df['real_label'],df['predicted_label']
+    f1 = f1_score(true_labels, pred_labels)
+    accuracy = accuracy_score(true_labels, pred_labels)
+    report = classification_report(true_labels, pred_labels)
+    print(f1, accuracy, report)
+    # return f1, accuracy, report
 
 
 def get_mp4_files(dataset_root_path: str):
@@ -114,6 +128,24 @@ def classify(file):
     
     return model.config.id2label[predicted_label]
 
+def predict_label(df):
+    predicted_label_list=[]
+    for file in tqdm(df['file_path']):
+        try:
+            real_label = file.split('/')[-2]
+            predicted_label = classify(file)
+            predicted_label_list.append(predicted_label)
+            print(real_label, predicted_label)
+        except ValueError as e:
+            print(f"Error processing {file}: {e}")
+            predicted_label_list.append(str(e))
+    predicted_labels_df = pd.DataFrame(predicted_label_list, columns=['predicted_label'])
+    return pd.concat([df, predicted_labels_df], axis=1)
+
+
+#--------------------------------------------------------------------------------------------------------------
+#-------------------------------------------------   MAIN   ---------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
 
 # Charger le modèle et le processeur d'image
 model_ckpt = '2nzi/videomae-surf-analytics'
@@ -126,73 +158,54 @@ files = get_mp4_files(dataset_root_path)
 
 files_data = {
     'file_path': [file for file in files],
-    'file_parent': [file.parent.name for file in files],
-    'file_parent_parent': [file.parent.parent.name for file in files]
+    'real_label': [file.parent.name for file in files],
+    'train_test_val': [file.parent.parent.name for file in files]
 }
 
-files_df = pd.DataFrame(files_data)
-predicted_label_list=[]
 
-for file in tqdm(files_df['file_path']):
-    try:
-        real_label = file.split('/')[-2]
-        predicted_label = classify(file)
-        predicted_label_list.append(predicted_label)
-        print(real_label, predicted_label)
-    except ValueError as e:
-        print(f"Error processing {file}: {e}")
-        predicted_label_list.append(str(e))
+train_test_val_df = pd.DataFrame(files_data)
+test_df = train_test_val_df[train_test_val_df['train_test_val']=='test']
+real_pred_df = predict_label(test_df)
 
-
-#%%
-# Afficher le DataFrame
-predicted_labels_df = pd.DataFrame(predicted_label_list, columns=['predicted_label'])
-files_df = pd.concat([files_df, predicted_labels_df], axis=1)
-
-
-#%%
 # files_df.to_csv('test.csv', index=False)
+#%%
 
-# %%
+def metriques(df):
+    true_labels,pred_labels=df['real_label'],df['predicted_label']
+    accuracy = accuracy_score(true_labels, pred_labels)
+    f1 = f1_score(true_labels, pred_labels,average='weighted')
 
+    print(accuracy,f1)
 
-files_df = pd.read_csv('label_real_pred.csv')
-files_df[files_df['file_parent']==files_df['predicted_label']].count()
-files_df[files_df['file_parent']!=files_df['predicted_label']].count()
+def matrice_confusion(df):
+    true_labels,pred_labels=df['real_label'],df['predicted_label']
+    labels = pred_labels.unique()
+    true_labels
+    conf_matrix = confusion_matrix(true_labels, pred_labels, labels=labels)
 
-files_df['predicted_label'].value_counts()
+    # Creating a DataFrame from the confusion matrix
+    conf_matrix_df = pd.DataFrame(conf_matrix, index=labels, columns=labels)
 
+    # Plotting using matplotlib and seaborn
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(conf_matrix_df, annot=True, fmt="d", cmap="viridis")
+    plt.title('Confusion Matrix')
+    plt.xlabel('Predicted Labels')
+    plt.ylabel('True Labels')
+    plt.show()
 
-# files_df = files_df[files_df['file_parent_parent']=='test']
-# files_df = files_df[files_df['file_parent_parent']=='val']
-# files_df = files_df[files_df['file_parent_parent']=='train']
+def evaluate(df):
+    true_labels,pred_labels=df['real_label'],df['predicted_label']
+    f1 = f1_score(true_labels, pred_labels,average='weighted')
+    accuracy = accuracy_score(true_labels, pred_labels)
+    report = classification_report(true_labels, pred_labels)
+    # return f1, accuracy, report
+    print(f1, accuracy)
+    print(report)
 
-true_labels,pred_labels=files_df['file_parent'],files_df['predicted_label']
-accuracy_score(true_labels, pred_labels)
-f1_score(true_labels, pred_labels,average='weighted')
+train_test_val_df = pd.read_csv('label_real_pred.csv')
 
+test_df = train_test_val_df[train_test_val_df['train_test_val']=='test']
 
-import pandas as pd
-from sklearn.metrics import confusion_matrix
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-
-
-labels = true_labels.unique()
-labels = pred_labels.unique()
-true_labels
-conf_matrix = confusion_matrix(true_labels, pred_labels, labels=labels)
-
-# Creating a DataFrame from the confusion matrix
-conf_matrix_df = pd.DataFrame(conf_matrix, index=labels, columns=labels)
-
-# Plotting using matplotlib and seaborn
-plt.figure(figsize=(10, 7))
-sns.heatmap(conf_matrix_df, annot=True, fmt="d", cmap="viridis")
-plt.title('Confusion Matrix')
-plt.xlabel('Predicted Labels')
-plt.ylabel('True Labels')
-plt.show()
-
-# %%
+evaluate(test_df)
+matrice_confusion(test_df)
