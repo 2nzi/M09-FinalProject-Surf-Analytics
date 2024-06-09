@@ -59,23 +59,23 @@ clip_duration = num_frames_to_sample * sample_rate / fps
 accuracy_metric = load_metric("accuracy")
 f1_metric = load_metric("f1")
 
-def compute_metrics(eval_pred):
-    predictions = eval_pred.predictions.argmax(axis=1)
-    references = eval_pred.label_ids
-    return accuracy_metric.compute(predictions=predictions, references=references)
-
-
 # def compute_metrics(eval_pred):
 #     predictions = eval_pred.predictions.argmax(axis=1)
 #     references = eval_pred.label_ids
+#     return accuracy_metric.compute(predictions=predictions, references=references)
+
+
+def compute_metrics(eval_pred):
+    predictions = eval_pred.predictions.argmax(axis=1)
+    references = eval_pred.label_ids
     
-#     accuracy = accuracy_metric.compute(predictions=predictions, references=references)
-#     f1 = f1_metric.compute(predictions=predictions, references=references, average='weighted')
+    accuracy = accuracy_metric.compute(predictions=predictions, references=references)
+    f1 = f1_metric.compute(predictions=predictions, references=references, average='weighted')
     
-#     return {
-#         "accuracy": accuracy["accuracy"],
-#         "f1": f1["f1"]
-#     }
+    return {
+        "accuracy": accuracy["accuracy"],
+        "f1": f1["f1"]
+    }
 
 # Define Collate Function
 def collate_fn(examples):

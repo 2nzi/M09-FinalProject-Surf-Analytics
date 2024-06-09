@@ -1,7 +1,7 @@
 [browser]
 serverAddress = '0.0.0.0'
 [server]
-port = 80
+port = 8501
 
 [global]
 dataFrameSerialization = "legacy"

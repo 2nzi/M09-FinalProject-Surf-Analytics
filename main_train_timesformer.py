@@ -116,7 +116,7 @@ test_dataset = pytorchvideo.data.Ucf101(
 
 
 new_model_name = "videomae-timesformer-surf-analytics"
-num_epochs = 5
+num_epochs = 10
 batch_size = 4
 
 args = TrainingArguments(
