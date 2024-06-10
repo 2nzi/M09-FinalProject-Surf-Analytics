@@ -32,7 +32,6 @@ def compute_metrics(eval_pred):
     return {"accuracy": accuracy["accuracy"], "f1": f1["f1"]}
 
 
-
 # Define Collate Function
 def collate_fn(examples):
     pixel_values = torch.stack([example["video"].permute(1, 0, 2, 3) for example in examples])
@@ -43,7 +42,7 @@ def collate_fn(examples):
 
 
 dataset_root_path = 'data-split'
-dataset_root_path = 'data-split-exemple'
+# dataset_root_path = 'data-split-exemple'
 dataset_root_path = pathlib.Path(dataset_root_path)
 train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
 
@@ -176,3 +175,6 @@ test_preds = np.argmax(test_predictions.predictions, axis=-1)
 test_labels = test_predictions.label_ids
 
 save_confusion_matrix(test_labels, test_preds, list(label2id.keys()), confusion_matrix_path=new_model_name)
+
+
+
