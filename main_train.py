@@ -6,28 +6,32 @@ import os
 import pathlib
 from torchvision.transforms import Compose, Lambda, Resize
 from pytorchvideo.transforms import UniformTemporalSubsample, Normalize, ApplyTransformToKey
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import numpy as np
 
 
-accuracy_metric = load_metric("accuracy")
-f1_metric = load_metric("f1")
+def save_confusion_matrix(labels, predictions, label_names, save_path):
+    cm = confusion_matrix(labels, predictions, labels=np.arange(len(label_names)))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_names)
+    fig, ax = plt.subplots(figsize=(10, 10))
+    disp.plot(ax=ax, cmap='Blues', values_format='d')
+    plt.xticks(rotation=45)
+    plt.savefig(save_path)
+    plt.close()
+
+accuracy_metric = load_metric('accuracy')
+f1_metric = load_metric('f1')
 
 def compute_metrics(eval_pred):
-    predictions = eval_pred.predictions.argmax(axis=1)
-    references = eval_pred.label_ids
-    return accuracy_metric.compute(predictions=predictions, references=references)
+    logits, labels = eval_pred
+    predictions = np.argmax(logits, axis=-1)
+    accuracy = accuracy_metric.compute(predictions=predictions, references=labels)
+    f1 = f1_metric.compute(predictions=predictions, references=labels, average='weighted')
+    return {"accuracy": accuracy["accuracy"], "f1": f1["f1"]}
 
 
-# def compute_metrics(eval_pred):
-#     predictions = eval_pred.predictions.argmax(axis=1)
-#     references = eval_pred.label_ids
-    
-#     accuracy = accuracy_metric.compute(predictions=predictions, references=references)
-#     f1 = f1_metric.compute(predictions=predictions, references=references, average='weighted')
-    
-#     return {
-#         "accuracy": accuracy["accuracy"],
-#         "f1": f1["f1"]
-#     }
 
 # Define Collate Function
 def collate_fn(examples):
@@ -39,6 +43,7 @@ def collate_fn(examples):
 
 
 dataset_root_path = 'data-split'
+dataset_root_path = 'data-split-exemple'
 dataset_root_path = pathlib.Path(dataset_root_path)
 train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
 
@@ -123,7 +128,7 @@ test_dataset = pytorchvideo.data.Ucf101(
     transform=transform,
 )
 
-new_model_name = "videomae-surf-analytics-2"
+new_model_name = "videomae-surf-analytics-3"
 num_epochs = 1
 batch_size = 4
 
@@ -164,3 +169,10 @@ trainer.log_metrics("val", val_evaluate)
 trainer.save_metrics("val", val_evaluate)
 trainer.save_state()
 trainer.save_model()
+
+
+test_predictions = trainer.predict(test_dataset)
+test_preds = np.argmax(test_predictions.predictions, axis=-1)
+test_labels = test_predictions.label_ids
+
+save_confusion_matrix(test_labels, test_preds, list(label2id.keys()), confusion_matrix_path=new_model_name)

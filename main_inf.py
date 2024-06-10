@@ -3,6 +3,7 @@ import av
 import torch
 from transformers import AutoImageProcessor, AutoModelForVideoClassification
 import streamlit as st
+import torch.nn as nn
 
 
 def read_video_pyav(container, indices):
@@ -52,7 +53,6 @@ def sample_frame_indices(clip_len, frame_sample_rate, seg_len):
 #     '''
 #     return 
 
-import torch.nn as nn
 
 
 def classify(file):

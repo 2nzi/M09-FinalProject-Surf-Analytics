@@ -164,6 +164,7 @@ cython_debug/
 /videomae-base-finetuned-2
 /videomae-base-finetuned
 /videomae-timesformer-surf-analytics
+/videomae-surf-analytics-2
 *.gif
 
 *.pdf
@@ -178,3 +179,4 @@ cython_debug/
 *.ipynb
 Dockerfile
 .dockerignore
+/data-split-exemple
