@@ -1,6 +1,11 @@
 #%%
+
+#----------------------------------------------------------------------------------------------------------
+#------------------------------------------------ IMPORT LIB ----------------------------------------------
+#----------------------------------------------------------------------------------------------------------
+
 import torch
-from transformers import TrainingArguments, Trainer, VideoMAEForVideoClassification, VideoMAEImageProcessor
+from transformers import TrainingArguments, Trainer
 from datasets import load_metric
 import pytorchvideo.data
 import os
@@ -12,13 +17,17 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import numpy as np
 torch.cuda.empty_cache()
 
+#----------------------------------------------------------------------------------------------------------
+#------------------------------------------------ CREATE FUNCTIONS ----------------------------------------
+#----------------------------------------------------------------------------------------------------------
 
-def save_confusion_matrix(labels, predictions, label_names, save_path):
+def save_confusion_matrix(labels, predictions, label_names, save_path, title='Confusion Matrix'):
     cm = confusion_matrix(labels, predictions, labels=np.arange(len(label_names)))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_names)
     fig, ax = plt.subplots(figsize=(10, 10))
     disp.plot(ax=ax, cmap='Blues', values_format='d')
     plt.xticks(rotation=45)
+    ax.set_title(title)
     plt.savefig(save_path)
     plt.close()
 
@@ -40,44 +49,132 @@ def collate_fn(examples):
     return {"pixel_values": pixel_values, "labels": labels}
 
 
-dataset_root_path = 'data-split'
-# dataset_root_path = 'data-split-exemple'
-dataset_root_path = pathlib.Path(dataset_root_path)
-train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
+#----------------------------------------------------------------------------------------------------------
+#--------------------------------------------- IMPORT DATA PATH -------------------------------------------
+#----------------------------------------------------------------------------------------------------------
 
+# !pip install requests
+# !pip install huggingface_hub
+colab = False
+if colab == True:
+    import requests
+    import zipfile
 
-# Iterate over surf classes and aggregate mp4 files
-all_video_file_paths = []
-for surf_class in train_test_val_dataset_path:
-    surf_class_path = dataset_root_path / surf_class
-    mp4_files = surf_class_path.glob("**/*.mp4")
-    all_video_file_paths.extend(mp4_files)
+    dataset_root_path = '/content/data_split'
+    # if os.path.exists(dataset_root_path):
+        # !rm -r /content/data_split
 
-all_video_file_paths = list(all_video_file_paths)
+    # URL of the zip file
+    url = 'https://huggingface.co/datasets/2nzi/surf-maneuvers/resolve/main/data-split.zip'
+    output_file = 'data-split.zip'
 
-class_labels = sorted({str(path).split("\\")[2] for path in all_video_file_paths})
-label2id = {label: i for i, label in enumerate(class_labels)}
-id2label = {i: label for label, i in label2id.items()}
-print(f"Unique classes: {list(label2id.keys())}.")
+    # Download the zip file
+    response = requests.get(url)
+    with open(output_file, 'wb') as file:
+        file.write(response.content)
 
-model_ckpt = "MCG-NJU/videomae-base"  # pre-trained model from which to fine-tune
-batch_size = 8  # batch size for training and evaluation
+    # Extract the zip file
+    with zipfile.ZipFile(output_file, 'r') as zip_ref:
+        zip_ref.extractall('data_split')
 
-image_processor = VideoMAEImageProcessor.from_pretrained(model_ckpt)
-model = VideoMAEForVideoClassification.from_pretrained(
-    model_ckpt,
-    label2id=label2id,
-    id2label=id2label,
-    ignore_mismatched_sizes=True,
-)
+    dataset_root_path = pathlib.Path(dataset_root_path)
+    train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
 
-mean = image_processor.image_mean
-std = image_processor.image_std
-if "shortest_edge" in image_processor.size:
-    height = width = image_processor.size["shortest_edge"]
+    all_video_file_paths = []
+    for surf_class in train_test_val_dataset_path:
+        surf_class_path = dataset_root_path / surf_class
+        mp4_files = surf_class_path.glob("**/*.mp4")
+        print(mp4_files)
+        all_video_file_paths.extend(mp4_files)
+
+    all_video_file_paths = list(all_video_file_paths)
+    class_labels = sorted({str(path).split("/")[-2] for path in all_video_file_paths})
+    label2id = {label: i for i, label in enumerate(class_labels)}
+    id2label = {i: label for label, i in label2id.items()}
+    print(f"Unique classes: {list(label2id.keys())}.")
+
 else:
-    height = image_processor.size["height"]
-    width = image_processor.size["width"]
+    dataset_root_path = 'data-split'
+    dataset_root_path = pathlib.Path(dataset_root_path)
+    train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
+
+
+    # Iterate over surf classes and aggregate mp4 files
+    all_video_file_paths = []
+    for surf_class in train_test_val_dataset_path:
+        surf_class_path = dataset_root_path / surf_class
+        mp4_files = surf_class_path.glob("**/*.mp4")
+        all_video_file_paths.extend(mp4_files)
+
+    all_video_file_paths = list(all_video_file_paths)
+
+    class_labels = sorted({str(path).split("\\")[-2] for path in all_video_file_paths})
+    label2id = {label: i for i, label in enumerate(class_labels)}
+    id2label = {i: label for label, i in label2id.items()}
+    print(f"Unique classes: {list(label2id.keys())}.")
+
+
+#%%
+#----------------------------------------------------------------------------------------------------------
+#------------------------------------------ CHOOSE MODEL TO FINE TUNE -------------------------------------
+#----------------------------------------------------------------------------------------------------------
+
+model_id = 1
+
+# VIDEOMAE
+if model_id==1:
+    from transformers import VideoMAEForVideoClassification, VideoMAEImageProcessor
+    video_processor = "MCG-NJU/videomae-base"  # image processing from pre-trained model
+    model_ckpt = video_processor  # pre-trained model from which to fine-tune
+    video_processor = VideoMAEImageProcessor.from_pretrained(video_processor)
+    model = VideoMAEForVideoClassification.from_pretrained(
+        model_ckpt,
+        label2id=label2id,
+        id2label=id2label,
+        ignore_mismatched_sizes=True,
+    )
+
+# VIVIT
+if model_id==2:
+    from transformers import VivitForVideoClassification,VivitImageProcessor
+
+    video_processor = "google/vivit-b-16x2-kinetics400"  
+    model_ckpt = "google/vivit-b-16x2-kinetics400"
+    video_processor = VivitImageProcessor.from_pretrained(video_processor)
+    model = VivitForVideoClassification.from_pretrained(
+        model_ckpt,
+        label2id=label2id,
+        id2label=id2label,
+        ignore_mismatched_sizes=True,
+    )
+
+
+#TIMESFORMER
+if model_id==3:
+    from transformers import VideoMAEImageProcessor,TimesformerForVideoClassification
+    video_processor = "MCG-NJU/videomae-base"
+    model_ckpt = "facebook/timesformer-base-finetuned-k400" 
+
+    video_processor = VideoMAEImageProcessor.from_pretrained(video_processor)
+    model = TimesformerForVideoClassification.from_pretrained(
+        model_ckpt,
+        label2id=label2id,
+        id2label=id2label,
+        ignore_mismatched_sizes=True,
+    )
+
+#----------------------------------------------------------------------------------------------------------
+#-------------------------- --------------- VIDEO TRANSFORMATION ------------------------------------------
+#----------------------------------------------------------------------------------------------------------
+
+
+mean = video_processor.image_mean
+std = video_processor.image_std
+if "shortest_edge" in video_processor.size:
+    height = width = video_processor.size["shortest_edge"]
+else:
+    height = video_processor.size["height"]
+    width = video_processor.size["width"]
 resize_to = (height, width)
 
 num_frames_to_sample = model.config.num_frames
@@ -103,6 +200,12 @@ transform = Compose(
     ]
 )
 
+
+#----------------------------------------------------------------------------------------------------------
+#------------------------------------------ APPLY TRANFORMATION -------------------------------------------
+#----------------------------------------------------------------------------------------------------------
+
+
 # Training dataset.
 train_dataset = pytorchvideo.data.Ucf101(
     data_path=os.path.join(dataset_root_path, "train"),
@@ -126,7 +229,14 @@ test_dataset = pytorchvideo.data.Ucf101(
     transform=transform,
 )
 
+
+#----------------------------------------------------------------------------------------------------------
+#--------------------------------------------- TRAIN NEW MODEL --------------------------------------------
+#----------------------------------------------------------------------------------------------------------
+
+
 new_model_name = "videomae-surf-analytics-sans-wandb"
+# new_model_name = f"videomae-surf-analytics-{model}"
 num_epochs = 5
 batch_size = 2
 
@@ -153,29 +263,42 @@ trainer = Trainer(
     args,
     train_dataset=train_dataset,
     eval_dataset=val_dataset,
-    tokenizer=image_processor,
+    tokenizer=video_processor,
     compute_metrics=compute_metrics,
     data_collator=collate_fn,
 )
 
+
+#----------------------------------------------------------------------------------------------------------
+#------------------------------------------------ SAVE METRICS ---------------------------------------------
+#----------------------------------------------------------------------------------------------------------
+
+print('Start Train')
 train_results = trainer.train()
+print('End Train')
+
+print('Start Evaluate')
 train_evaluate = trainer.evaluate(train_dataset)
 test_evaluate = trainer.evaluate(test_dataset)
 val_evaluate = trainer.evaluate(val_dataset)
+print('End Evaluate')
 
+print('Start log metrics and model')
 trainer.log_metrics("test", test_evaluate)
 trainer.save_metrics("test", test_evaluate)
 trainer.log_metrics("val", val_evaluate)
 trainer.save_metrics("val", val_evaluate)
 trainer.save_state()
 trainer.save_model()
-# trainer.state.log_history()
 
 test_predictions = trainer.predict(test_dataset)
 test_preds = np.argmax(test_predictions.predictions, axis=-1)
 test_labels = test_predictions.label_ids
 
-save_confusion_matrix(test_labels, test_preds, list(label2id.keys()), confusion_matrix_path='./'+new_model_name)
+new_model_name = "confusion_matrix.png"
+save_confusion_matrix(test_labels, test_preds, list(label2id.keys()), './' + new_model_name, title='My Model Confusion Matrix')
+print('End log metrics and model')
+print('End')
 
 
 # %%
