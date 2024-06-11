@@ -1,50 +1,19 @@
-#%%
+
 import torch
-from transformers import TrainingArguments, Trainer, VideoMAEForVideoClassification, VideoMAEImageProcessor
+from transformers import TrainingArguments, Trainer, VideoMAEImageProcessor,VivitForVideoClassification
+from transformers import VivitImageProcessor, VivitModel
 from datasets import load_metric
 import pytorchvideo.data
 import os
 import pathlib
 from torchvision.transforms import Compose, Lambda, Resize
 from pytorchvideo.transforms import UniformTemporalSubsample, Normalize, ApplyTransformToKey
-import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-import numpy as np
-torch.cuda.empty_cache()
-
-
-def save_confusion_matrix(labels, predictions, label_names, save_path):
-    cm = confusion_matrix(labels, predictions, labels=np.arange(len(label_names)))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_names)
-    fig, ax = plt.subplots(figsize=(10, 10))
-    disp.plot(ax=ax, cmap='Blues', values_format='d')
-    plt.xticks(rotation=45)
-    plt.savefig(save_path)
-    plt.close()
-
-accuracy_metric = load_metric('accuracy')
-f1_metric = load_metric('f1')
-
-def compute_metrics(eval_pred):
-    logits, labels = eval_pred
-    predictions = np.argmax(logits, axis=-1)
-    accuracy = accuracy_metric.compute(predictions=predictions, references=labels)
-    f1 = f1_metric.compute(predictions=predictions, references=labels, average='weighted')
-    return {"accuracy": accuracy["accuracy"], "f1": f1["f1"]}
-
-
-# Define Collate Function
-def collate_fn(examples):
-    pixel_values = torch.stack([example["video"].permute(1, 0, 2, 3) for example in examples])
-    labels = torch.tensor([example["label"] for example in examples])
-    return {"pixel_values": pixel_values, "labels": labels}
 
 
 dataset_root_path = 'data-split'
-# dataset_root_path = 'data-split-exemple'
+dataset_root_path = 'data-split-exemple'
 dataset_root_path = pathlib.Path(dataset_root_path)
 train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
-
 
 # Iterate over surf classes and aggregate mp4 files
 all_video_file_paths = []
@@ -60,15 +29,15 @@ label2id = {label: i for i, label in enumerate(class_labels)}
 id2label = {i: label for label, i in label2id.items()}
 print(f"Unique classes: {list(label2id.keys())}.")
 
-model_ckpt = "MCG-NJU/videomae-base"  # pre-trained model from which to fine-tune
-batch_size = 8  # batch size for training and evaluation
-
+model_ckpt = "google/vivit-b-16x2-kinetics400"  # pre-trained model from which to fine-tune
 image_processor = VideoMAEImageProcessor.from_pretrained(model_ckpt)
-model = VideoMAEForVideoClassification.from_pretrained(
+image_processor = VivitImageProcessor.from_pretrained(model_ckpt)
+
+model = VivitForVideoClassification.from_pretrained(
     model_ckpt,
     label2id=label2id,
     id2label=id2label,
-    ignore_mismatched_sizes=True,
+    ignore_mismatched_sizes=True,  # Pour le fine tune
 )
 
 mean = image_processor.image_mean
@@ -81,10 +50,24 @@ else:
 resize_to = (height, width)
 
 num_frames_to_sample = model.config.num_frames
+# sample_rate = 16
 sample_rate = 4
 fps = 30
 clip_duration = num_frames_to_sample * sample_rate / fps
 
+# Define Evaluation Metric
+metric = load_metric("accuracy")
+
+def compute_metrics(eval_pred):
+    predictions = eval_pred.predictions.argmax(axis=1)
+    references = eval_pred.label_ids
+    return metric.compute(predictions=predictions, references=references)
+
+# Define Collate Function
+def collate_fn(examples):
+    pixel_values = torch.stack([example["video"].permute(1, 0, 2, 3) for example in examples])
+    labels = torch.tensor([example["label"] for example in examples])
+    return {"pixel_values": pixel_values, "labels": labels}
 
 transform = Compose(
     [
@@ -126,14 +109,15 @@ test_dataset = pytorchvideo.data.Ucf101(
     transform=transform,
 )
 
-new_model_name = "videomae-surf-analytics-sans-wandb"
-num_epochs = 5
-batch_size = 2
+
+new_model_name = "videomae-vivit-surf-analytics"
+num_epochs = 10
+batch_size = 4
 
 args = TrainingArguments(
     new_model_name,
     remove_unused_columns=False,
-    eval_strategy="epoch",
+    evaluation_strategy="epoch",
     save_strategy="epoch",
     learning_rate=5e-5,
     per_device_train_batch_size=batch_size,
@@ -141,11 +125,9 @@ args = TrainingArguments(
     warmup_ratio=0.1,
     logging_steps=10,
     load_best_model_at_end=True,
-    metric_for_best_model="f1",
-    # metric_for_best_model="accuracy",
+    metric_for_best_model="accuracy",
     push_to_hub=True,
     max_steps=(train_dataset.num_videos // batch_size) * num_epochs,
-    report_to="wandb"
 )
 
 trainer = Trainer(
@@ -169,13 +151,3 @@ trainer.log_metrics("val", val_evaluate)
 trainer.save_metrics("val", val_evaluate)
 trainer.save_state()
 trainer.save_model()
-# trainer.state.log_history()
-
-test_predictions = trainer.predict(test_dataset)
-test_preds = np.argmax(test_predictions.predictions, axis=-1)
-test_labels = test_predictions.label_ids
-
-save_confusion_matrix(test_labels, test_preds, list(label2id.keys()), confusion_matrix_path='./'+new_model_name)
-
-
-# %%
