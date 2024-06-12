@@ -53,68 +53,27 @@ def collate_fn(examples):
 #--------------------------------------------- IMPORT DATA PATH -------------------------------------------
 #----------------------------------------------------------------------------------------------------------
 
-# !pip install requests
-# !pip install huggingface_hub
-colab = False
-if colab == True:
-    import requests
-    import zipfile
 
-    dataset_root_path = '/content/data_split'
-    # if os.path.exists(dataset_root_path):
-        # !rm -r /content/data_split
-
-    # URL of the zip file
-    url = 'https://huggingface.co/datasets/2nzi/surf-maneuvers/resolve/main/data-split.zip'
-    output_file = 'data-split.zip'
-
-    # Download the zip file
-    response = requests.get(url)
-    with open(output_file, 'wb') as file:
-        file.write(response.content)
-
-    # Extract the zip file
-    with zipfile.ZipFile(output_file, 'r') as zip_ref:
-        zip_ref.extractall('data_split')
-
-    dataset_root_path = pathlib.Path(dataset_root_path)
-    train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
-
-    all_video_file_paths = []
-    for surf_class in train_test_val_dataset_path:
-        surf_class_path = dataset_root_path / surf_class
-        mp4_files = surf_class_path.glob("**/*.mp4")
-        print(mp4_files)
-        all_video_file_paths.extend(mp4_files)
-
-    all_video_file_paths = list(all_video_file_paths)
-    class_labels = sorted({str(path).split("/")[-2] for path in all_video_file_paths})
-    label2id = {label: i for i, label in enumerate(class_labels)}
-    id2label = {i: label for label, i in label2id.items()}
-    print(f"Unique classes: {list(label2id.keys())}.")
-
-else:
-    dataset_root_path = 'data-split'
-    dataset_root_path = pathlib.Path(dataset_root_path)
-    train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
+dataset_root_path = 'data-split'
+dataset_root_path = pathlib.Path(dataset_root_path)
+train_test_val_dataset_path = [item.name for item in dataset_root_path.glob("**") if item.is_dir()]
 
 
-    # Iterate over surf classes and aggregate mp4 files
-    all_video_file_paths = []
-    for surf_class in train_test_val_dataset_path:
-        surf_class_path = dataset_root_path / surf_class
-        mp4_files = surf_class_path.glob("**/*.mp4")
-        all_video_file_paths.extend(mp4_files)
+# Iterate over surf classes and aggregate mp4 files
+all_video_file_paths = []
+for surf_class in train_test_val_dataset_path:
+    surf_class_path = dataset_root_path / surf_class
+    mp4_files = surf_class_path.glob("**/*.mp4")
+    all_video_file_paths.extend(mp4_files)
 
-    all_video_file_paths = list(all_video_file_paths)
+all_video_file_paths = list(all_video_file_paths)
 
-    class_labels = sorted({str(path).split("\\")[-2] for path in all_video_file_paths})
-    label2id = {label: i for i, label in enumerate(class_labels)}
-    id2label = {i: label for label, i in label2id.items()}
-    print(f"Unique classes: {list(label2id.keys())}.")
+class_labels = sorted({str(path).split("\\")[-2] for path in all_video_file_paths})
+label2id = {label: i for i, label in enumerate(class_labels)}
+id2label = {i: label for label, i in label2id.items()}
+print(f"Unique classes: {list(label2id.keys())}.")
 
 
-#%%
 #----------------------------------------------------------------------------------------------------------
 #------------------------------------------ CHOOSE MODEL TO FINE TUNE -------------------------------------
 #----------------------------------------------------------------------------------------------------------

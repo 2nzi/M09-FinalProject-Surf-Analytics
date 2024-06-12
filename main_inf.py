@@ -62,9 +62,6 @@ def classify(file):
     indices = sample_frame_indices(clip_len=16, frame_sample_rate=4, seg_len=container.streams.video[0].frames)
     video = read_video_pyav(container, indices)
 
-    if container.streams.video[0].frames < 16:
-        return 'Video trop courte'
-
     inputs = image_processor(list(video), return_tensors="pt")
 
     with torch.no_grad():
