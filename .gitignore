@@ -182,3 +182,6 @@ Dockerfile
 .dockerignore
 /data-split-exemple
 /notebook
+/test
+/.streamlit
+/api_streamlit
