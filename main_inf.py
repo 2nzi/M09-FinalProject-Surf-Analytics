@@ -71,9 +71,9 @@ def classify(file):
     # model predicts one of the 400 Kinetics-400 classes
     predicted_label = logits.argmax(-1).item()
     print(model.config.id2label[predicted_label])
-    st.write(f'Les labels: {model.config.id2label}')
-    st.write(f'répartiton des probilités {logits}')
-    st.write(f'répartiton des probilités {nn.Softmax(dim=-1)(logits)}')
+    # st.write(f'Les labels: {model.config.id2label}')
+    # st.write(f'répartiton des probilités {logits}')
+    # st.write(f'répartiton des probilités {nn.Softmax(dim=-1)(logits)}')
     
     return model.config.id2label[predicted_label]
 
